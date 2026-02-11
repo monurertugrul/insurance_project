@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# OS files
+.DS_Store
+
+# Model artifacts
+models/*.json
+models/*.bin
+models/*.pkl
+
+# Chroma DB
+chroma_db/
+
+# Streamlit
+.streamlit/
+
+# FastAPI logs
+logs/
+
+# Secrets
+*.env
+.env
+
