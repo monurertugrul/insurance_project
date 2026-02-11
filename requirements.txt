@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic
+streamlit
+
+numpy
+pandas
+scikit-learn
+xgboost
+
+torch
+
+faiss-cpu
+
+python-dotenv
+tqdm
