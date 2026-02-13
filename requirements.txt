@@ -10,8 +10,15 @@ xgboost
 
 torch
 
+<<<<<<< HEAD
 python-dotenv
 tqdm
 google-generativeai
 chromadb
 google-genai
+=======
+faiss-cpu
+
+python-dotenv
+tqdm
+>>>>>>> 5bcfb76255dfa2437767b891465f0111c415f53e
