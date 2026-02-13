@@ -1,10 +1,7 @@
-# agents/frontier_agent.py
-
 import os
 import json
 import re
 from openai import OpenAI
-
 
 SYSTEM_PROMPT_FRONTIER = """
 You are an expert medical insurance pricing assistant.
@@ -26,16 +23,15 @@ You MUST respond with ONLY this JSON object:
 }
 """
 
-
 class FrontierAgent:
-    def __init__(self, api_key=None, model="gpt-4o-mini", rag=None):
+    def __init__(self, api_key=None, model="meta-llama/llama-3.2-3b-instruct", rag=None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY not set.")
 
         self.client = OpenAI(api_key=self.api_key)
         self.model = model
-        self.rag = rag  # InsuranceRAG_XGB instance
+        self.rag = rag
 
     def _build_prompt(self, features, similar_cases):
         rag_context = ""
@@ -53,23 +49,17 @@ class FrontierAgent:
         )
 
     def price(self, features: dict):
-        # Retrieve similar cases via XGBoost RAG
         similar_cases = self.rag.retrieve(features, k=3) if self.rag else []
-
         prompt = self._build_prompt(features, similar_cases)
 
         resp = self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT_FRONTIER},
-                {"role": "user", "content": prompt},
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
         )
 
         text = resp.choices[0].message.content
 
-        # Extract JSON
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
             return {

@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pydantic
+streamlit
+
+numpy
+pandas
+scikit-learn
+xgboost
+
+torch
+
+python-dotenv
+tqdm
+google-generativeai
+chromadb
+google-genai

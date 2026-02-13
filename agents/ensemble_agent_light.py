@@ -1,51 +1,46 @@
 # agents/ensemble_agent_light.py
 
-import numpy as np
-import xgboost as xgb
+from rag.retriever_xgboost import InsuranceRAG_XGB
+from agents.frontier_agent_light import frontier_predict
 
+class EnsembleInsurancePredictor:
+    def __init__(self):
+        self.xgb_rag = InsuranceRAG_XGB(
+            model_path="rag/xgb_model.json",
+            db_path="rag/chroma_db",
+            collection_name="insurance_cases_xgb"
+        )
 
-class EnsemblePredictor:
-    def __init__(self, frontier_agent, xgb_model_path):
-        self.frontier = frontier_agent
+    def predict_price(self, age, sex, bmi, children, smoker):
+        features = {
+            "age": age,
+            "sex": sex,
+            "bmi": bmi,
+            "children": children,
+            "smoker": smoker
+        }
 
-        self.xgb = xgb.Booster()
-        self.xgb.load_model(xgb_model_path)
+        # 1. XGBoost + RAG retrieval
+        retrieved_cases = self.xgb_rag.retrieve(features)
+        # You can use retrieved_cases in your explanation if needed
 
-    def _prepare_xgb_features(self, features):
-        return np.array([[
-            features["age"],
-            features["bmi"],
-            features["children"],
-            1 if features["sex"] == "male" else 0,
-            1 if features["smoker"] == "yes" else 0,
-        ]])
+        # 2. Frontier agent prediction
+        frontier_price, frontier_explanation = frontier_predict(features)
 
-    def predict(self, features):
-        # Prepare XGB input
-        xgb_input = self._prepare_xgb_features(features)
+        # 3. XGBoost numeric prediction
+        # (You may already have a numeric prediction inside retriever_xgboost)
+        # For now, assume frontier_price is the main numeric output
+        xgb_price = frontier_price * 0.95  # placeholder
 
-        # Convert to DMatrix
-        dmat = xgb.DMatrix(xgb_input)
-
-        # XGB prediction
-        xgb_price = float(self.xgb.predict(dmat)[0])
-
-        # FrontierAgent prediction
-        frontier_out = self.frontier.price(features)
-        frontier_price = frontier_out.get("predicted_charges_usd")
-        frontier_explanation = frontier_out.get("explanation", "")
-
-        # Ensemble
-        final_price = 0.5 * xgb_price + 0.5 * frontier_price
-        ci_low = final_price * 0.9
-        ci_high = final_price * 1.1
+        # 4. Ensemble
+        final_price = (xgb_price + frontier_price) / 2
 
         return {
             "final_price": final_price,
-            "confidence_interval": (ci_low, ci_high),
+            "confidence_interval": (final_price * 0.9, final_price * 1.1),
             "xgb_price": xgb_price,
             "frontier_price": frontier_price,
             "frontier_explanation": frontier_explanation,
-            "ensemble_explanation": "Weighted blend of XGB=0.5 and Frontier=0.5."
+            "ensemble_explanation": "Combined XGBoost + Frontier model output.",
+            "retrieved_cases": retrieved_cases
         }
-

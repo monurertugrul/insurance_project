@@ -1,0 +1,32 @@
+# Ignore virtual environments
+.venv/
+env/
+venv/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore notebooks
+*.ipynb
+
+# Ignore local vector DBs (unless needed)
+rag/chroma_db/
+
+# Ignore UI folder if not used by Streamlit
+UI/__pycache__/
+
+# Ignore environment files
+.env
+
+# Ignore git
+.git
+.gitignore
+
+# Ignore Fly config
+fly.toml
+
+# Ignore OS junk
+.DS_Store

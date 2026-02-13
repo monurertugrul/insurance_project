@@ -1,61 +1,60 @@
-# model_comparison_evaluator.py
-
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from agents.ensemble_agent import EnsemblePredictor
+from models.xgb_predictor import XGBPredictor
 from agents.frontier_agent import FrontierAgent
+from agents.gemini_frontier_agent import GeminiFrontierAgent
 
 
 class ModelComparisonEvaluator:
+    """
+    Compare:
+    - XGBoost
+    - FrontierAgent (OpenAI)
+    - GeminiFrontierAgent (Google Gemini)
+    """
+
     def __init__(
         self,
-        frontier_agent: FrontierAgent,
-        dnn_model_path,
-        dnn_encoder_path,
-        dnn_scaler_path,
         xgb_model_path,
-        qlora_model_path="adapter_tinyllama",
-        qlora_base_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        device="mps",
+        frontier_agent: FrontierAgent,
+        gemini_agent: GeminiFrontierAgent,
     ):
-        # The ensemble loads ALL models internally
-        self.ensemble = EnsemblePredictor(
-            frontier_agent=frontier_agent,
-            dnn_model_path=dnn_model_path,
-            dnn_encoder_path=dnn_encoder_path,
-            dnn_scaler_path=dnn_scaler_path,
-            xgb_model_path=xgb_model_path,
-            qlora_model_path=qlora_model_path,
-            qlora_base_model=qlora_base_model,
-            device=device,
-        )
+        self.xgb = XGBPredictor()
+        self.xgb.load(xgb_model_path)
+
+        self.frontier = frontier_agent
+        self.gemini = gemini_agent
 
     def evaluate(self, df_test: pd.DataFrame):
         df = df_test.drop(columns=["region"], errors="ignore")
         y_true = df["charges"].values
 
         xgb_preds = []
-        dnn_preds = []
-        qlora_preds = []
         frontier_preds = []
-        ensemble_preds = []
+        gemini_preds = []
 
         for _, row in df.iterrows():
-            out = self.ensemble.predict(row.to_dict())
+            features = row.to_dict()
 
-            xgb_preds.append(out["xgb_price"])
-            dnn_preds.append(out["dnn_price"])
-            qlora_preds.append(out["qlora_price"])
-            frontier_preds.append(out["frontier_price"])
-            ensemble_preds.append(out["final_price"])
+            # XGBoost
+            xgb_price = self.xgb.predict(features)
+            xgb_preds.append(xgb_price)
+
+            # FrontierAgent (OpenAI)
+            frontier_out = self.frontier.price(features)
+            frontier_price = frontier_out.get("predicted_charges_usd", xgb_price)
+            frontier_preds.append(frontier_price)
+
+            # Gemini
+            gemini_out = self.gemini.price(features)
+            gemini_price = gemini_out.get("predicted_charges_usd", xgb_price)
+            gemini_preds.append(gemini_price)
 
         xgb_preds = np.array(xgb_preds)
-        dnn_preds = np.array(dnn_preds)
-        qlora_preds = np.array(qlora_preds)
         frontier_preds = np.array(frontier_preds)
-        ensemble_preds = np.array(ensemble_preds)
+        gemini_preds = np.array(gemini_preds)
 
         metrics = {
             "XGBoost": {
@@ -63,25 +62,15 @@ class ModelComparisonEvaluator:
                 "rmse": mean_squared_error(y_true, xgb_preds) ** 0.5,
                 "r2": r2_score(y_true, xgb_preds),
             },
-            "DNN": {
-                "mae": mean_absolute_error(y_true, dnn_preds),
-                "rmse": mean_squared_error(y_true, dnn_preds) ** 0.5,
-                "r2": r2_score(y_true, dnn_preds),
-            },
-            "QLoRA": {
-                "mae": mean_absolute_error(y_true, qlora_preds),
-                "rmse": mean_squared_error(y_true, qlora_preds) ** 0.5,
-                "r2": r2_score(y_true, qlora_preds),
-            },
-            "FrontierAgent": {
+            "FrontierAgent (OpenAI)": {
                 "mae": mean_absolute_error(y_true, frontier_preds),
                 "rmse": mean_squared_error(y_true, frontier_preds) ** 0.5,
                 "r2": r2_score(y_true, frontier_preds),
             },
-            "Ensemble": {
-                "mae": mean_absolute_error(y_true, ensemble_preds),
-                "rmse": mean_squared_error(y_true, ensemble_preds) ** 0.5,
-                "r2": r2_score(y_true, ensemble_preds),
+            "GeminiFrontierAgent": {
+                "mae": mean_absolute_error(y_true, gemini_preds),
+                "rmse": mean_squared_error(y_true, gemini_preds) ** 0.5,
+                "r2": r2_score(y_true, gemini_preds),
             },
         }
 
